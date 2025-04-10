@@ -17,14 +17,14 @@ def main():
     # Initialize logger
     logger = get_logger()
     logger.info("Starting trace processor service...")
-    
+
     # Load configuration
     try:
         config = load_config()
         logger.info("Configuration loaded successfully")
     except Exception as e:
         logger.fatal("Failed to load configuration", e)
-    
+
     # Start health check server
     try:
         server_port = int(config.server_port)
@@ -36,14 +36,14 @@ def main():
     except Exception as e:
         logger.error(f"Failed to start health check server: {str(e)}", e)
         # Continue without health checks - won't affect core functionality
-    
+
     # Initialize GCS client
     try:
         gcs_client = GCSClient(logger)
         logger.info("GCS client initialized successfully")
     except Exception as e:
         logger.fatal("Failed to initialize GCS client", e)
-    
+
     # Initialize Kafka producer
     try:
         producer = KafkaProducer(
@@ -57,14 +57,14 @@ def main():
         logger.info("Kafka producer initialized successfully")
     except Exception as e:
         logger.fatal("Failed to initialize Kafka producer", e)
-    
+
     # Initialize processor
     try:
         survey_processor = SurveyProcessor(gcs_client, producer, logger)
         logger.info("Survey processor initialized successfully")
     except Exception as e:
         logger.fatal("Failed to initialize survey processor", e)
-    
+
     # Initialize Kafka consumer
     try:
         consumer = KafkaConsumer(
@@ -82,54 +82,54 @@ def main():
         logger.info("Kafka consumer initialized successfully")
     except Exception as e:
         logger.fatal("Failed to initialize Kafka consumer", e)
-    
+
     # Setup signal handling for graceful shutdown
     shutdown_event = threading.Event()
-    
+
     def signal_handler(sig, frame):
         logger.info(f"Received signal {sig}, shutting down...")
         shutdown_event.set()
-    
+
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-    
+
     # Start consuming messages in a separate thread
     consumer_thread = threading.Thread(target=consumer.consume)
     consumer_thread.daemon = True
     consumer_thread.start()
     logger.info("Kafka consumer started")
-    
+
     # Initialized, mark as ready for K8s probes
     try:
         health_server.set_ready(True)
     except Exception:
         pass
-    
+
     # Wait for shutdown signal
     shutdown_event.wait()
-    
+
     # Graceful shutdown
     logger.info("Starting graceful shutdown...")
-    
+
     try:
         # Close the consumer
         logger.info("Closing Kafka consumer...")
         consumer.close()
-        
+
         # Wait for consumer thread to finish
         consumer_thread.join(timeout=30)
-        
+
         # Close the producer
         logger.info("Closing Kafka producer...")
         producer.close()
-        
+
         # Stop health check server
         try:
             logger.info("Stopping health check server...")
             health_server.stop()
         except Exception as e:
             logger.error(f"Error stopping health check server: {str(e)}", e)
-        
+
         logger.info("Shutdown complete")
     except Exception as e:
         logger.error("Error during shutdown", e)

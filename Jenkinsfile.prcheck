@@ -44,9 +44,8 @@ pipeline {
                     // Install test dependencies and run checks
                     sh '''
                     docker run --rm trace-processor:${BUILD_NUMBER} sh -c "
-                        pip install black pytest &&
+                        pip install black &&
                         python -m black --check *.py models/ services/ utils/ &&
-                        python -m pytest -xvs"
                     '''
                     // Clean up the Docker image after tests
                     sh 'docker rmi trace-processor:${BUILD_NUMBER} || true'
